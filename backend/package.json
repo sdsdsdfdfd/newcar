@@ -6,5 +6,8 @@
     "express": "^4.21.2",
     "mysql": "^2.18.1",
     "ws": "^8.18.0"
+  },
+  "scripts": {
+    "start": "node car.js"  
   }
 }
