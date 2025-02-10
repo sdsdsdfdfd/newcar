@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>车辆传感器数据</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* 设置页面内容居中 */
+    /* 设置页面内容居中 */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      flex-direction: column;
+      text-align: center;
+      position: relative; /* 使按钮的绝对定位生效 */
+    }
+
+    /* 设置标题样式 */
+    h1 {
+      margin-bottom: 20px; /* 设置标题与图表之间的间距 */
+    }
+
+    /* 设置按钮样式 */
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      position: absolute; /* 绝对定位 */
+      background-color: #add8e6;  /* 淡蓝色背景 */
+      border: none;  /* 去除边框 */
+      border-radius: 5px;  /* 圆角 */
+      color: white;  /* 白色文字 */
+      transition: background-color 0.3s ease;
+      z-index: 1000;  /* 确保按钮在最上层 */
+    }
+
+    /* 按钮悬停时的效果 */
+    button:hover {
+      background-color: #87cefa;  /* 更改悬停时的背景色为稍微深一点的蓝色 */
+    }
+
+    /* 清空数据库按钮（左上角） */
+    #clearDatabaseButton {
+      background-color: red; /* 红色背景 */
+      top: 10px; /* 靠近页面顶部 */
+      left: 10px; /* 靠近页面左侧 */
+      width: auto; /* 避免按钮宽度异常 */
+    }
+
+    /* 清空数据库按钮悬停时 */
+    #clearDatabaseButton:hover {
+      background-color: darkred;
+    }
+
+    /* 清空数据按钮（右上角） */
+    #clearButton {
+      top: 10px; /* 靠近页面顶部 */
+      right: 10px; /* 靠近页面右侧 */
+      width: auto; /* 避免按钮宽度异常 */
+    }
+
+    /* 清空数据按钮悬停时 */
+    #clearButton:hover {
+      background-color: #4682b4; /* 深蓝色 */
+    }
+  </style>
+</head>
+<body>
+  <h1>车辆传感器数据</h1>
+  <canvas id="myChart" width="400" height="200"></canvas>
+  <!-- 添加清空数据按钮 -->
+  <button id="clearButton">清空页面</button>
+ <!-- 添加清空数据库按钮 -->
+ <button id="clearDatabaseButton">清空数据库</button>
+
+  <script>
+    // 通过 API 获取数据并绘制柱状图
+    fetch('http://localhost:3000/api/car/sensors')
+      .then(response => response.json())
+      .then(data => {
+        const temperatures = data.map(item => item.温度);
+        const humidities = data.map(item => item.湿度);
+        const smokes = data.map(item => item.烟雾浓度);
+        const speeds = data.map(item => item.速度);
+
+        // 创建柱状图
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const myChart = new Chart(ctx, {
+          type: 'bar', // 设置为柱状图
+          data: {
+            labels: data.map((_, index) => `数据 ${index + 1}`), // X轴标签
+            datasets: [
+              {
+                label: '温度 (°C)',
+                data: temperatures,
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+              },
+              {
+                label: '湿度 (%)',
+                data: humidities,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+              },
+              {
+                label: '烟雾浓度 (ppm)',
+                data: smokes,
+                backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                borderColor: 'rgba(255, 159, 64, 1)',
+                borderWidth: 1
+              },
+              {
+                label: '速度 (km/h)',
+                data: speeds,
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+              }
+            ]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+
+        // WebSocket连接并实时更新图表数据
+        const socket = new WebSocket('ws://localhost:4000');
+
+        socket.onmessage = function(event) {
+          const newData = JSON.parse(event.data);
+          console.log('Received WebSocket Data:', newData);
+
+          // 假设WebSocket推送的数据格式是 { temperature: 25, humidity: 60, smoke: 0.5, speed: 50 }
+          // 更新每个数据集
+          if (newData.temperature !== undefined) {
+            myChart.data.datasets[0].data.push(newData.temperature);
+          }
+          if (newData.humidity !== undefined) {
+            myChart.data.datasets[1].data.push(newData.humidity);
+          }
+          if (newData.smoke !== undefined) {
+            myChart.data.datasets[2].data.push(newData.smoke);
+          }
+          if (newData.speed !== undefined) {
+            myChart.data.datasets[3].data.push(newData.speed);
+          }
+
+          // 更新X轴标签
+          myChart.data.labels.push(`数据 ${myChart.data.labels.length + 1}`);
+
+          // 更新图表
+          myChart.update();
+        };
+
+        socket.onopen = () => {
+          console.log('WebSocket已连接');
+        };
+
+        socket.onerror = (error) => {
+          console.error('WebSocket发生错误', error);
+        };
+        // 为清空按钮添加点击事件
+        document.getElementById('clearButton').addEventListener('click', () => {
+          // 清空所有数据集
+          myChart.data.datasets.forEach(dataset => {
+            dataset.data = [];
+          });
+
+          // 清空X轴标签
+          myChart.data.labels = [];
+
+          // 更新图表
+          myChart.update();
+        });
+        // 为清空数据库按钮添加点击事件
+        document.getElementById('clearDatabaseButton').addEventListener('click', () => {
+          // 发送请求清空数据库
+          fetch('http://localhost:3000/api/car/clear', {
+            method: 'POST',
+          })
+          .then(response => response.json())
+          .then(data => {
+            alert('数据库数据已成功清空');
+          })
+          .catch(error => {
+            console.error('清空数据库数据失败:', error);
+            alert('清空数据库数据失败');
+          });
+        });
+      })
+      .catch(error => console.error('获取数据失败:', error));
+  </script>
+</body>
+</html>
+
+
+
